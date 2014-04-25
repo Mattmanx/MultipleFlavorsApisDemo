@@ -1,0 +1,174 @@
+import java.util.regex.Pattern
+
+project.ext["versionName"] = getVersionName()
+project.ext["versionCode"] = buildVersionCode()
+
+apply plugin: 'android'
+
+// apply the signing configuration, if provided
+if(project.hasProperty("build_signingConfig")
+        && new File(project.build_signingConfig).exists()) {
+    logger.debug("[SIGNING CONFIG] Applying signing configuration to release builds from: " + project.build_signingConfig);
+    apply from: project.build_signingConfig;
+} else {
+    logger.debug("[SIGNING CONFIG] No release signing configuration found.");
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+}
+
+android {
+    compileSdkVersion 17
+    buildToolsVersion "19.0.0"
+
+    defaultConfig {
+        minSdkVersion 17
+        targetSdkVersion 19
+        versionName project.versionName
+        versionCode project.versionCode
+    }
+
+    buildTypes {
+        release {
+            versionNameSuffix = (project.isRelease ? "" : "-SNAPSHOT")
+        }
+    }
+
+    productFlavors {
+        platformsigned {
+            versionName project.versionName + "-ps"
+        }
+        someothervendor {
+            versionName project.versionName + "-sov"
+        }
+    }
+
+    packagingOptions {
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/license.txt'
+    }
+}
+
+//Override generated manifest so that system UID is used for platformsigned builds, but not someothervendor
+android.applicationVariants.all { variant ->
+
+    if(variant.packageApplication)
+    {
+        // if we're in a task where we're outputting an artifact for anything beyond debugging, let's
+        // prepend with the system.subsystem, per required naming contention, and append the targeted
+        // device platform, or ALL.  The publishing process will append the version, as necessary.
+        if (variant.buildType.name == "release") {
+            variant.outputFile = new File(variant.outputFile.parentFile, variant.outputFile.name
+                    .replace("-" + variant.buildType.name, "")
+                    .replace(".apk", "-" + project.versionName + ".apk"))
+
+            project.ext.set("artifact", variant.outputFile)
+        }
+    }
+
+    variant.processManifest.doLast {
+        copy {
+            // Pull from merged manifest
+            try {
+                from("${buildDir}/manifests") {
+                    include "${variant.dirName}/AndroidManifest.xml"
+                }
+            } catch (e) {
+                println "error: " + e
+            }
+
+            // Drop into variant-specific manifest folder
+            into("${buildDir}/manifests/${variant.name}")
+
+            // use the varian
+            def name = variant.name.toString()
+            def sharedUserId = "com.bluefletch.adaptertester"
+
+            // *** SET APP NAME ***
+            if (name.contains("platformsigned")) {
+                sharedUserId = "android.uid.system"
+            }
+
+            // *** REPLACE LINES IN MANIFEST ***
+            // --- add appName
+            filter {
+                String line ->
+                    line.replaceAll("SHARED_USER_ID",
+                            sharedUserId);
+            }
+        }
+    }
+
+    // *** SET PATH TO NEW MANIFEST ***
+    variant.processResources.manifestFile = file("${buildDir}/manifests/${variant.name}/${variant.dirName}/AndroidManifest.xml")
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if(project.isRelease) {
+        logger.info("IS RELEASE")
+    } else {
+        logger.info("IS SNAPSHOT")
+        project.version=project.version + "-SNAPSHOT"
+    }
+}
+
+def getVersionName() {
+    //Gets the version name from the manifest
+    def manifestFile = file("src/main/AndroidManifest.xml")
+    def patternVersionName = Pattern.compile("versionName=\"(.+)\"")
+    def manifestText = manifestFile.getText()
+    def matcherVersionName = patternVersionName.matcher(manifestText)
+    matcherVersionName.find()
+    def versionName = matcherVersionName.group(1)
+    logger.debug("Version Name requested - returning " + versionName)
+    return versionName
+}
+
+def getVersionCode() {
+    //Gets the version code from the manifest
+    def manifestFile = file("src/main/AndroidManifest.xml")
+    def manifestText = manifestFile.getText()
+
+    def patternVersionCode = Pattern.compile("versionCode=\"(\\d+)\"")
+    def matcherVersionCode = patternVersionCode.matcher(manifestText)
+    matcherVersionCode.find()
+    def versionCode = Integer.parseInt(matcherVersionCode.group(1))
+    logger.debug("Version Code requested - returning " + versionCode)
+    return versionCode
+}
+
+def buildVersionCode() {
+    if(!project.hasProperty("versionName")) {
+        logger.error("project.versionName has not been established.  Unable to build version code.")
+        return 0
+    } else {
+        def majorMinorBuild = project.versionName.tokenize(".")
+        def vCode = 0;
+        def powerOfTen = 1;
+        majorMinorBuild.reverse().eachWithIndex() { obj, i -> (vCode += (obj.toInteger() * powerOfTen)); powerOfTen *= 100; }
+
+        logger.info("Build version code [" + vCode + "] from version name [" + project.versionName + "].")
+
+        return vCode;
+    }
+}
+
+task increaseVersion << {
+    logger.debug(":increaseVersion - Incrementing Package and Manifest Version...")
+    def manifestFile = file("src/main/AndroidManifest.xml")
+    def manifestText = manifestFile.getText()
+
+    def patternVersionNumber = Pattern.compile("versionName=\"(\\d+)\\.(\\d+)\\.(\\d+)\"")
+    def matcherVersionNumber = patternVersionNumber.matcher(manifestText)
+    matcherVersionNumber.find()
+    def majorVersion = Integer.parseInt(matcherVersionNumber.group(1))
+    def minorVersion = Integer.parseInt(matcherVersionNumber.group(2))
+    def buildVersion = Integer.parseInt(matcherVersionNumber.group(3))
+    def manifestContent = matcherVersionNumber.replaceAll("versionName=\"" + majorVersion + "." + minorVersion + "." + ++buildVersion + "\"")
+    manifestFile.write(manifestContent)
+}

@@ -1,0 +1,55 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.bluefletch.demo.flavoredapis.MainActivity"
+    tools:ignore="MergeRootFrame" >
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_gravity="left|top">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/main_title"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Add an Hour!"
+            android:id="@+id/change_time"
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="40dp"
+            android:paddingTop="40dp"
+            android:paddingBottom="40dp"
+            android:width="300dp"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Take over Settings!"
+            android:id="@+id/override_settings"
+            android:layout_below="@+id/change_time"
+            android:layout_alignStart="@+id/change_time"
+            android:layout_marginTop="10dp"
+            android:paddingTop="40dp"
+            android:paddingBottom="40dp"
+            android:width="300dp"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reboot!"
+            android:id="@+id/reboot"
+            android:layout_below="@+id/override_settings"
+            android:layout_alignStart="@+id/override_settings"
+            android:layout_marginTop="10dp"
+            android:paddingTop="40dp"
+            android:paddingBottom="40dp"
+            android:width="300dp"/>
+    </RelativeLayout>
+</FrameLayout>
